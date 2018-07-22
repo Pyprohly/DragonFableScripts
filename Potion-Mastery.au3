@@ -3,7 +3,7 @@
 ; DragonFable_Potion-Mastery.au3
 
 ; Created by /u/Pyprohly
-; Script Version 2.6.0
+; Script Version 2.6.2
 ; Created on Friday, 07 July 2017
 ; Modified on Sunday, 22 July 2018
 ; Written for DragonFable, Build 14.2.52
@@ -20,6 +20,8 @@
 ; Press F9 to terminate the script.
 ; AutoIt3's pixel colour inspection functions are not DPI aware! Make sure scaling is at 100% in ‘Display settings’.
 
+$bAutoResetLoopIfErrorIsEncountered = True
+$iQuestTimeValidationLimit = 55 ; seconds
 $bAutoSellRewardsWhenInventoryIsFull = True
 $bConfirmFirstSell = False
 
@@ -63,7 +65,6 @@ Func IsOptionsIconVisible()
    Local $aColoursInRegion[] = [0x232820, 0x2F2F2C, 0x20211F]
    For $i In $aColoursInRegion
 	  PixelSearch($aPos1[0], $aPos1[1], $aPos2[0], $aPos2[1], $i, 2)
-
 	  If @error Then
 		 Return False
 	  EndIf
@@ -410,6 +411,7 @@ Func FetchPlayerInventoryStats()
 	  Exit 1
    EndIf
 
+   ; Open inventory
    Local $aPos = GetPosFromPercentage($aPosGameFrameTopLeft, $aPosGameFrameBottomRight, 0.415430267062315, 0.912280701754386)
    MouseClick('left', $aPos[0], $aPos[1])
    Sleep(325)
@@ -420,10 +422,10 @@ Func FetchPlayerInventoryStats()
    $iSlotNumbersCheckSumPrevious = 0
    While 1
 	  If $iTotalInventorySlots < 9 Then
-		 $aPos = GetPosFromPercentage($aPosGameFrameTopLeft, $aPosGameFrameBottomRight, 0.109792284866469, 0.272594752186589 + 0.0472334682861 * $iTotalInventorySlots)
-;~ 		 MouseMove($aPos[0], $aPos[1])
-;~ 		 WaitEnter()
-		 If PixelGetColor($aPos[0], $aPos[1]) = 0xD1D1D1 Then
+		 Local $aPos1 = GetPosFromPercentage($aPosGameFrameTopLeft, $aPosGameFrameBottomRight, 0.417735042735043, 0.28134110787172 + 0.0472334682861 * $iTotalInventorySlots)
+		 Local $aPos2 = GetPosFromPercentage($aPosGameFrameTopLeft, $aPosGameFrameBottomRight, 0.44017094017094, 0.294460641399417 + 0.0472334682861 * $iTotalInventorySlots)
+		 PixelSearch($aPos1[0], $aPos1[1], $aPos2[0], $aPos2[1], 0xD1D1D1, 1)
+		 If Not @error Then
 			$iTotalInventoryEmptySlots += 1
 		 EndIf
 
@@ -444,8 +446,10 @@ Func FetchPlayerInventoryStats()
 			$iSlotNumbersCheckSumPrevious = $iSlotNumbersCheckSum
 		 EndIf
 
-		 $aPos = GetPosFromPercentage($aPosGameFrameTopLeft, $aPosGameFrameBottomRight, 0.109792284866469, 0.272594752186589 + 0.0472334682861 * 8)
-		 If PixelGetColor($aPos[0], $aPos[1]) = 0xD1D1D1 Then
+		 $aPos1 = GetPosFromPercentage($aPosGameFrameTopLeft, $aPosGameFrameBottomRight, 0.417735042735043, 0.28134110787172 + 0.0472334682861 * 8)
+		 $aPos2 = GetPosFromPercentage($aPosGameFrameTopLeft, $aPosGameFrameBottomRight, 0.44017094017094, 0.294460641399417 + 0.0472334682861 * 8)
+		 PixelSearch($aPos1[0], $aPos1[1], $aPos2[0], $aPos2[1], 0xD1D1D1, 1)
+		 If Not @error Then
 			$iTotalInventoryEmptySlots += 1
 		 EndIf
 
@@ -460,9 +464,6 @@ EndFunc
 HotKeySet('{F9}', 'Quit')
 
 Global $aPosGameFrameTopLeft, $aPosGameFrameBottomRight
-
-Local $bAutoResetLoopIfErrorIsEncountered = False
-Local $iQuestTimeValidationLimit = 55 ; seconds
 
 Local $iSceneState = 0
 ; 0 - Warlic’s Tent portal
@@ -519,8 +520,8 @@ WinActivate('DragonFable - Web RPG')
 
 $aPosGameFrameTopLeft = GetMouseCoordsOnClick('Click top left corner of game frame', 'Step 1 of 2', 1)
 $aPosGameFrameBottomRight = GetMouseCoordsOnClick('Click bottom right corner of game frame', 'Step 2 of 2', 1)
-;~ Global $aPosGameFrameTopLeft[] = [19, 144]
-;~ Global $aPosGameFrameBottomRight[] = [955, 830]
+;~ Global $aPosGameFrameTopLeft[] = [22, 144]
+;~ Global $aPosGameFrameBottomRight[] = [958, 830]
 
 ConsoleWrite('(' & $aPosGameFrameTopLeft[0] & ', ' & $aPosGameFrameTopLeft[1] & ')' & @LF)
 ConsoleWrite('(' & $aPosGameFrameBottomRight[0] & ', ' & $aPosGameFrameBottomRight[1] & ')' & @LF)
@@ -632,8 +633,8 @@ While 1
 			   Exit 0
 			EndIf
 		 Else
-			Local $aClickPos = GetPosFromPercentage($aPosGameFrameTopLeft, $aPosGameFrameBottomRight, 0.93, 0.42)
-			MouseClick('left', $aClickPos[0], $aClickPos[1])
+			Local $aPos = GetPosFromPercentage($aPosGameFrameTopLeft, $aPosGameFrameBottomRight, 0.93, 0.42)
+			MouseClick('left', $aPos[0], $aPos[1])
 
 			; assert scene change -> Gold orb planet thingy on top of Warlic’s Tent
 			Local $aPos1, $aPos2
@@ -648,6 +649,8 @@ While 1
 
 			   If TimerDiff($hTimer) > 6000 Then
 				  If $bAutoResetLoopIfErrorIsEncountered Then
+					 ConsoleWrite('Error encountered. Attempting to reset the loop.' & @LF)
+
 					 FastTravel("Warlic's Tent")
 					 If @error Then
 						Exit 1
@@ -659,7 +662,6 @@ While 1
 
 			   Sleep(100)
 			WEnd
-			Local $hTimer
 
 			Sleep(100)
 			$iSceneState += 1
@@ -681,6 +683,8 @@ While 1
 
 			If TimerDiff($hTimer) > 6000 Then
 			   If $bAutoResetLoopIfErrorIsEncountered Then
+				  ConsoleWrite('Error encountered. Attempting to reset the loop.' & @LF)
+
 				  FastTravel("Warlic's Tent")
 				  If @error Then
 					 Exit 1
@@ -692,7 +696,6 @@ While 1
 
 			Sleep(100)
 		 WEnd
-		 Local $hTimer
 
 		 Sleep(100)
 		 $iSceneState += 1
@@ -716,6 +719,8 @@ While 1
 
 			If TimerDiff($hTimer) > 6000 Then
 			   If $bAutoResetLoopIfErrorIsEncountered Then
+				  ConsoleWrite('Error encountered. Attempting to reset the loop.' & @LF)
+
 				  FastTravel("Warlic's Tent")
 				  If @error Then
 					 Exit 1
@@ -756,6 +761,8 @@ While 1
 
 			If TimerDiff($hTimer) > 6000 Then
 			   If $bAutoResetLoopIfErrorIsEncountered Then
+				  ConsoleWrite('Error encountered. Attempting to reset the loop.' & @LF)
+
 				  FastTravel("Warlic's Tent")
 				  If @error Then
 					 Exit 1
@@ -802,7 +809,24 @@ While 1
 				  $aPos1 = GetPosFromPercentage($aPosGameFrameTopLeft, $aPosGameFrameBottomRight, $aReagentSamplingRegions[$i][0][0], $aReagentSamplingRegions[$i][0][1])
 				  $aPos2 = GetPosFromPercentage($aPosGameFrameTopLeft, $aPosGameFrameBottomRight, $aReagentSamplingRegions[$i][1][0], $aReagentSamplingRegions[$i][1][1])
 				  If PixelChecksum($aPos1[0], $aPos1[1], $aPos2[0], $aPos2[1]) <> $aReagentCheckSum[$i] Then
-					 $aReagentNeeded[$iCounter] = $i
+					 If $iCounter >= UBound($aReagentNeeded) Then
+						If $bAutoResetLoopIfErrorIsEncountered Then
+						   ConsoleWrite('Error encountered. Attempting to reset the loop.' & @LF)
+
+						   FastTravel("Warlic's Tent")
+						   If @error Then
+							  Exit 1
+						   EndIf
+
+						   $iSceneState = -1
+						   ExitLoop 2
+						Else
+						   Exit 1
+						EndIf
+					 Else
+						$aReagentNeeded[$iCounter] = $i
+					 EndIf
+
 					 ConsoleWrite($i & @LF)
 					 Sleep(920)
 					 $iCounter += 1
@@ -815,10 +839,15 @@ While 1
 
 			If ($iCounter < 3) Or ($iCounter > 6) Then
 			   If $bAutoResetLoopIfErrorIsEncountered Then
+				  ConsoleWrite('Error encountered. Attempting to reset the loop.' & @LF)
+
 				  FastTravel("Warlic's Tent")
 				  If @error Then
 					 Exit 1
 				  EndIf
+
+				  $iSceneState = -1
+				  ExitLoop
 			   Else
 				  Exit 1
 			   EndIf
@@ -854,7 +883,7 @@ While 1
 			   Local $fPosYPercentage = $aReagentPositions[$aReagentNeeded[$i]][1]
 			   Local $aPos = GetPosFromPercentage($aPosGameFrameTopLeft, $aPosGameFrameBottomRight, $fPosXPercentage, $fPosYPercentage)
 			   If $i = 0 Then
-				  ; click twice to compensate for the countdown text disengaging the cursor at the start of each round
+				  ; Extra click to compensate for the countdown text disengaging the cursor at the start of each round
 				  MouseClick('left', $aPos[0], $aPos[1], 1 , 3)
 			   EndIf
 
@@ -876,10 +905,6 @@ While 1
 	  Case 5 ; End Potion Mastery
 		 ConsoleWrite('Scene 5' & @LF)
 
-		 $aPos = GetPosFromPercentage($aPosGameFrameTopLeft, $aPosGameFrameBottomRight, 0.52, 0.358974358974359)
-		 MouseClick('left', $aPos[0], $aPos[1])
-		 Sleep(300)
-
 		 If IsDeclared('hQuestTime') Then
 			If VarGetType($hQuestTime) = 'Double' Then
 			   Local $iQuestTime = TimerDiff($hQuestTime)
@@ -895,11 +920,58 @@ While 1
 			EndIf
 		 EndIf
 
-		 $aPos = GetPosFromPercentage($aPosGameFrameTopLeft, $aPosGameFrameBottomRight, 0.52, 0.759784075573549)
+		 ; Click "Complete Quest"
+		 $aPos = GetPosFromPercentage($aPosGameFrameTopLeft, $aPosGameFrameBottomRight, 0.5, 0.358974358974359)
+		 MouseClick('left', $aPos[0], $aPos[1])
+		 Sleep(300)
+
+		 ; Objective completed scroll text. Click "Close"
+		 $aPos = GetPosFromPercentage($aPosGameFrameTopLeft, $aPosGameFrameBottomRight, 0.5, 0.759784075573549)
 		 MouseClick('left', $aPos[0], $aPos[1])
 		 Sleep(500)
 
-		 $aPos = GetPosFromPercentage($aPosGameFrameTopLeft, $aPosGameFrameBottomRight, 0.52, 0.754385964912281)
+		 ; assert scene change -> Collect reward scroll text
+		 Local $aPos1, $aPos2
+		 Local $hTimer = TimerInit()
+		 Local $iWarlicCastleScene = 0
+		 Local $bWarlicCastleScene = False
+		 While Not $bWarlicCastleScene
+			$aPos1 = GetPosFromPercentage($aPosGameFrameTopLeft, $aPosGameFrameBottomRight, 0.084401709401709, 0.145772594752187)
+			$aPos2 = GetPosFromPercentage($aPosGameFrameTopLeft, $aPosGameFrameBottomRight, 0.107905982905983, 0.182215743440233)
+			PixelSearch($aPos1[0], $aPos1[1], $aPos2[0], $aPos2[1], 0x9D9D9D, 1)
+			If Not @error Then
+			   $iWarlicCastleScene += 1
+			EndIf
+
+			$aPos1 = GetPosFromPercentage($aPosGameFrameTopLeft, $aPosGameFrameBottomRight, 0.261752136752137, 0.416909620991254)
+			$aPos2 = GetPosFromPercentage($aPosGameFrameTopLeft, $aPosGameFrameBottomRight, 0.277777777777778, 0.453352769679333)
+			PixelSearch($aPos1[0], $aPos1[1], $aPos2[0], $aPos2[1], 0xC9D0D1, 1)
+			If Not @error Then
+			   $iWarlicCastleScene += 1
+			EndIf
+
+			$aPos1 = GetPosFromPercentage($aPosGameFrameTopLeft, $aPosGameFrameBottomRight, 0.591880341880342, 0.567055393586006)
+			$aPos2 = GetPosFromPercentage($aPosGameFrameTopLeft, $aPosGameFrameBottomRight, 0.661324786324786, 0.600583090379009)
+			PixelSearch($aPos1[0], $aPos1[1], $aPos2[0], $aPos2[1], 0xEACEA6, 1)
+			If Not @error Then
+			   $iWarlicCastleScene += 1
+			EndIf
+
+			If $iWarlicCastleScene = 3 Then
+			   $bWarlicCastleScene = True
+			Else
+			   $iWarlicCastleScene = 0
+			EndIf
+
+			If TimerDiff($hTimer) > 5000 Then
+			   Exit 1
+			EndIf
+
+			Sleep(100)
+		 WEnd
+
+		 ; Collect reward. Click "Keep"
+		 $aPos = GetPosFromPercentage($aPosGameFrameTopLeft, $aPosGameFrameBottomRight, 0.5, 0.754385964912281)
 		 MouseClick('left', $aPos[0], $aPos[1])
 		 Sleep(800)
 
@@ -1012,6 +1084,8 @@ While 1
 
 			If TimerDiff($hTimer) > 6000 Then
 			   If $bAutoResetLoopIfErrorIsEncountered Then
+				  ConsoleWrite('Error encountered. Attempting to reset the loop.' & @LF)
+
 				  FastTravel('Falconreach')
 				  If @error Then
 					 Exit 1
@@ -1057,6 +1131,8 @@ While 1
 
 			If TimerDiff($hTimer) > 6000 Then
 			   If $bAutoResetLoopIfErrorIsEncountered Then
+				  ConsoleWrite('Error encountered. Attempting to reset the loop.' & @LF)
+
 				  FastTravel('Falconreach')
 				  If @error Then
 					 Exit 1
@@ -1086,7 +1162,7 @@ While 1
 		 Sleep(100)
 
 		 $iInventoryEmptySpaceLeft = $aPlayerInventoryStats[1]
-		 ConsoleWrite('Assuming ' & $iInventoryEmptySpaceLeft & ' empty inventory spaces')
+		 ConsoleWrite('Assuming ' & $iInventoryEmptySpaceLeft & ' empty inventory spaces' & @LF)
 
 		 FastTravel("Warlic's Tent")
 		 If @error Then
