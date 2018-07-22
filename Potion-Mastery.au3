@@ -3,25 +3,25 @@
 ; DragonFable_Potion-Mastery.au3
 
 ; Created by /u/Pyprohly
-; Script Version 2.5.0
+; Script Version 2.6.0
 ; Created on Friday, 07 July 2017
-; Modified on Friday, 20 July 2018
+; Modified on Sunday, 22 July 2018
 ; Written for DragonFable, Build 14.2.52
 
 ; Description:
-; Generates gold at a rate of about just less than 400 gold per minute by farming the Potion Mastery quest.
+; Generates gold at a rate of about 400 gold per minute by farming the Potion Mastery quest from Nythera.
 
 ; Instructions:
-; Logon to DragonFable and run this script. You will be asked to click the top left then bottom right corners of the game frame; the script will immediately act afterwards. If your character is not at Warlic’s Tent you will be taken to this location first. Once there, your inventory will be scanned if the auto sell rewards option is enabled (DO NOT CLICK DURING THIS PROCESS).
+; Login to DragonFable and run this script. You will be asked to click the top left then bottom right corners of the game frame.
+; The script will act immediately afterwards. If your character is not at Warlic’s Tent you will be taken to this location first.
+; Once there, your inventory will be scanned to determine the number of empty slots. Refrain from clicking during this process.
 
 ; Note:
 ; Press F9 to terminate the script.
 ; AutoIt3's pixel colour inspection functions are not DPI aware! Make sure scaling is at 100% in ‘Display settings’.
 
-Local $bAutoSellRewardsWhenInventoryIsFull = True
-Local $bConfirmFirstSell = True
-
-Opt('MouseClickDelay', 50)
+$bAutoSellRewardsWhenInventoryIsFull = True
+$bConfirmFirstSell = False
 
 Func Quit()
    Exit
@@ -45,7 +45,7 @@ EndFunc
 
 Func GetPosFromPercentage($aPosTopLeft, $aPosBottomRight, $fXPercent, $fYPercent)
    If Not ((0 <= $fXPercent And $fXPercent <= 1) Or (0 <= $fYPercent And $fYPercent <= 1))  Then
-	  SetError(1, Default, 'Percentage value warning')
+	  SetError(1, Default, 'Percentage value error')
    EndIf
 
    Local $aPos[2]
@@ -250,11 +250,11 @@ Func IsPlayerAtWarlicPortal()
    Return True
 EndFunc
 
-Func SelectInventorySlot($iIndex, $iSelected = Null, $iOffset = Null)
+Func SelectInventorySlot($iTarget, $iSelected = Null, $iScrollOffset = Null)
    Static $iSlotSelected = 0
-   Static $iSlotOffset   = 0
+   Static $iSlotOffset = 0
 
-   Local $iSlotTarget = $iIndex
+   Local $iSlotTarget = $iTarget
    Local $iSlotDelta
 
    Local $aPos
@@ -262,47 +262,118 @@ Func SelectInventorySlot($iIndex, $iSelected = Null, $iOffset = Null)
    If VarGetType($iSelected) = 'Int32' Then
 	  $iSlotSelected = $iSelected
    EndIf
-   If VarGetType($iOffset) = 'Int32' Then
-	  $iSlotOffset = $iOffset
+   If VarGetType($iScrollOffset) = 'Int32' Then
+	  $iSlotOffset = $iScrollOffset
    EndIf
 
    $iSlotDelta = $iSlotTarget - $iSlotSelected
-
+   $iSlotSelected = $iSlotTarget
    If $iSlotOffset + $iSlotDelta < 0 Then
-	  ; need to scroll upwards
-	  For $i = 0 To -($iSlotDelta + $iSlotOffset) - 1
-		 $aPos = GetPosFromPercentage($aPosGameFrameTopLeft, $aPosGameFrameBottomRight, 0.531157270029674, 0.245614035087719)
-		 MouseClick('left', $aPos[0], $aPos[1])
-	  Next
+	  ; Need to scroll upwards
+	  $aPos = GetPosFromPercentage($aPosGameFrameTopLeft, $aPosGameFrameBottomRight, 0.531157270029674, 0.245614035087719)
+	  MouseClick('left', $aPos[0], $aPos[1], -($iSlotDelta + $iSlotOffset))
 
 	  $iSlotOffset = 0
 
+	  ; Select item
+	  Sleep(20)
 	  $aPos = GetPosFromPercentage($aPosGameFrameTopLeft, $aPosGameFrameBottomRight, 0.483311081441923, 0.244939271255061 + 0.0472334682861 * $iSlotOffset)
 	  MouseClick('left', $aPos[0], $aPos[1])
-
-	  $iSlotSelected = $iSlotTarget
    ElseIf $iSlotOffset + $iSlotDelta > 9 Then
-	  ; need to scroll downwards
-	  For $i = 0 To ($iSlotDelta - (9 - $iSlotOffset)) - 1
-		 $aPos = GetPosFromPercentage($aPosGameFrameTopLeft, $aPosGameFrameBottomRight, 0.531157270029674, 0.665317139001349)
-		 MouseClick('left', $aPos[0], $aPos[1])
-	  Next
+	  ; Need to scroll downwardss
+	  $aPos = GetPosFromPercentage($aPosGameFrameTopLeft, $aPosGameFrameBottomRight, 0.531157270029674, 0.665317139001349)
+	  MouseClick('left', $aPos[0], $aPos[1], ($iSlotDelta - (9 - $iSlotOffset)))
 
 	  $iSlotOffset = 9
 
+	  ; Select item
+	  Sleep(20)
 	  $aPos = GetPosFromPercentage($aPosGameFrameTopLeft, $aPosGameFrameBottomRight, 0.483311081441923, 0.244939271255061 + 0.0472334682861 * $iSlotOffset)
 	  MouseClick('left', $aPos[0], $aPos[1])
-
-	  $iSlotSelected = $iSlotTarget
    Else
 	  ; select the target slot
 	  $iSlotOffset = $iSlotOffset + $iSlotDelta
 
 	  $aPos = GetPosFromPercentage($aPosGameFrameTopLeft, $aPosGameFrameBottomRight, 0.121167161226508, 0.244939271255061 + 0.0472334682861 * $iSlotOffset)
 	  MouseClick('left', $aPos[0], $aPos[1])
-
-	  $iSlotSelected = $iSlotTarget
    EndIf
+EndFunc
+
+Func SellFromInventory($iStartSellIndex, $iSellAmount, $iTab = 0)
+   If $iTab > 0 Then
+	  Local $aPosLeftTab = [0.249666221628838, 0.087431693989071]
+	  Local $aPosRightTab = [0.391188251001335, 0.087431693989071]
+
+	  Local $aPos1 = $aPosRightTab
+	  Local $aPos2 = $aPosLeftTab
+
+	  If $iTab = 2 Then
+		 $aPos1 = $aPosLeftTab
+		 $aPos2 = $aPosRightTab
+	  EndIf
+
+	  Local $aPos
+	  $aPos = GetPosFromPercentage($aPosGameFrameTopLeft, $aPosGameFrameBottomRight, $aPos1[0], $aPos1[1])
+	  MouseClick('left', $aPos[0], $aPos[1])
+	  $aPos = GetPosFromPercentage($aPosGameFrameTopLeft, $aPosGameFrameBottomRight, $aPos2[0], $aPos2[1])
+	  MouseClick('left', $aPos[0], $aPos[1])
+   EndIf
+   Sleep(100)
+
+   For $i = $iStartSellIndex To $iStartSellIndex + $iSellAmount - 1
+	  SelectInventorySlot($iStartSellIndex, 0, 0)
+
+	  ; Sell button
+	  Local $aPos = GetPosFromPercentage($aPosGameFrameTopLeft, $aPosGameFrameBottomRight, 0.777777777777778, 0.794460641399417)
+	  MouseClick('left', $aPos[0], $aPos[1])
+	  Sleep(100)
+
+	  ; Sell confirmation dialogue
+	  $aPos = GetPosFromPercentage($aPosGameFrameTopLeft, $aPosGameFrameBottomRight, 0.39465875370919, 0.445344129554656)
+	  If PixelGetColor($aPos[0], $aPos[1]) = 0xEACEA6 Then
+		 ; Confirm first item sell
+		 If IsDeclared('bConfirmFirstSell') And VarGetType($bConfirmFirstSell) = 'Bool' Then
+			If $bConfirmFirstSell Then
+			   ToolTip('Press enter to continue selling.', Default, Default, 'Press enter', 1)
+			   While 1
+				  If _IsPressed('0D') Then
+					 ToolTip('')
+					 Sleep(150)
+					 ExitLoop
+				  EndIf
+				  Sleep(50)
+			   WEnd
+			   $bConfirmFirstSell = False
+			EndIf
+		 EndIf
+
+		 ; Button "Yes"
+		 $aPos = GetPosFromPercentage($aPosGameFrameTopLeft, $aPosGameFrameBottomRight, 0.43620178041543, 0.516869095816464)
+;~ 		 MouseMove($aPos[0], $aPos[1])
+		 MouseClick('left', $aPos[0], $aPos[1])
+		 Sleep(100)
+
+		 ; assert scene change -> Inventory
+		 Local $hTimer = TimerInit()
+		 While 1
+			$aPos = GetPosFromPercentage($aPosGameFrameTopLeft, $aPosGameFrameBottomRight, 0.09, 0.460188933873144)
+			If PixelGetColor($aPos[0], $aPos[1]) = 0xEACEA6 Then
+			   ExitLoop
+			EndIf
+
+			If TimerDiff($hTimer) > 4000 Then
+			   Exit 1
+			EndIf
+
+			Sleep(100)
+		 WEnd
+	  Else
+		 ; No more items to sell
+		 Return 1
+	  EndIf
+
+	  Sleep(100)
+   Next
 EndFunc
 
 Func IsOnInventoryInterface()
@@ -326,7 +397,7 @@ Func CloseInventoryInterface()
 EndFunc
 
 Func FetchPlayerInventoryStats()
-   ; returns a two-element array of the player's inventory size and free space avaliable -> [$iTotalInventorySlots, $iTotalInventoryEmptySlots]
+   ; returns a two-element array of the player's inventory size and empty spaces avaliable
 
    Local $iTotalInventorySlots
    Local $iTotalInventoryEmptySlots
@@ -336,8 +407,7 @@ Func FetchPlayerInventoryStats()
    EndIf
 
    If Not IsOptionsIconVisible() Then
-	  Local $aRetn[2] = [0, 0]
-	  Return SetError(1, Default, $aRetn)
+	  Exit 1
    EndIf
 
    Local $aPos = GetPosFromPercentage($aPosGameFrameTopLeft, $aPosGameFrameBottomRight, 0.415430267062315, 0.912280701754386)
@@ -347,53 +417,43 @@ Func FetchPlayerInventoryStats()
    $iTotalInventorySlots = 0
    $iTotalInventoryEmptySlots = 0
 
-   Local $iCounter = 1
-   Local $bScrollBarIsAtBottom = False
-   While Not $bScrollBarIsAtBottom
-	  If $iCounter < 10 Then
-		 $aPos = GetPosFromPercentage($aPosGameFrameTopLeft, $aPosGameFrameBottomRight, 0.109792284866469, 0.226720647773279 + 0.0472334682861 * $iCounter)
+   $iSlotNumbersCheckSumPrevious = 0
+   While 1
+	  If $iTotalInventorySlots < 9 Then
+		 $aPos = GetPosFromPercentage($aPosGameFrameTopLeft, $aPosGameFrameBottomRight, 0.109792284866469, 0.272594752186589 + 0.0472334682861 * $iTotalInventorySlots)
 ;~ 		 MouseMove($aPos[0], $aPos[1])
+;~ 		 WaitEnter()
 		 If PixelGetColor($aPos[0], $aPos[1]) = 0xD1D1D1 Then
 			$iTotalInventoryEmptySlots += 1
 		 EndIf
 
 		 $iTotalInventorySlots += 1
-		 $iCounter += 1
 	  Else
-		 $aPos = GetPosFromPercentage($aPosGameFrameTopLeft, $aPosGameFrameBottomRight, 0.531157270029674, 0.665317139001349)
+		 ; Scroll down arrow
+		 $aPos = GetPosFromPercentage($aPosGameFrameTopLeft, $aPosGameFrameBottomRight, 0.527777777777778, 0.663265306122449)
 		 MouseClick('left', $aPos[0], $aPos[1])
+		 Sleep(150)
 
-		 $aPos1 = GetPosFromPercentage($aPosGameFrameTopLeft, $aPosGameFrameBottomRight, 0.518024032042724, 0.599271402550091)
-		 $aPos2 = GetPosFromPercentage($aPosGameFrameTopLeft, $aPosGameFrameBottomRight, 0.541048466864491, 0.623481781376518)
+		 Local $aPos1 = GetPosFromPercentage($aPosGameFrameTopLeft, $aPosGameFrameBottomRight, 0.104700854700855, 0.603498542274053)
+		 Local $aPos2 = GetPosFromPercentage($aPosGameFrameTopLeft, $aPosGameFrameBottomRight, 0.132478632478632, 0.677842565597668)
+		 Local $iSlotNumbersCheckSum = PixelChecksum($aPos1[0], $aPos1[1], $aPos2[0], $aPos2[1])
 
-		 Sleep(100)
-		 Local $bScrollBarIsAtBottom = True, $iScrollBarIsAtBottom = 0
-		 Local $aColoursInRegion[] = [0x83511D, 0x996633, 0x3A200C]
-		 For $i In $aColoursInRegion
-			PixelSearch($aPos1[0], $aPos1[1], $aPos2[0], $aPos2[1], $i, 2)
-
-			If Not @error Then
-			   $iScrollBarIsAtBottom += 1
-			EndIf
-		 Next
-		 If $iScrollBarIsAtBottom = 3 Then
-			$bScrollBarIsAtBottom = False
+		 If $iSlotNumbersCheckSum = $iSlotNumbersCheckSumPrevious Then
+			ExitLoop
+		 Else
+			$iSlotNumbersCheckSumPrevious = $iSlotNumbersCheckSum
 		 EndIf
 
-		 Sleep(0)
-		 $aPos = GetPosFromPercentage($aPosGameFrameTopLeft, $aPosGameFrameBottomRight, 0.109792284866469, 0.226720647773279 + 0.0472334682861 * 9)
+		 $aPos = GetPosFromPercentage($aPosGameFrameTopLeft, $aPosGameFrameBottomRight, 0.109792284866469, 0.272594752186589 + 0.0472334682861 * 8)
 		 If PixelGetColor($aPos[0], $aPos[1]) = 0xD1D1D1 Then
 			$iTotalInventoryEmptySlots += 1
 		 EndIf
 
 		 $iTotalInventorySlots += 1
-
-		 Sleep(50)
 	  EndIf
    WEnd
 
    Local $aRetn[2] = [$iTotalInventorySlots, $iTotalInventoryEmptySlots]
-   ConsoleWrite('FetchPlayerInventoryStats() -> ' & '[' & $aRetn[0] & ', ' & $aRetn[1] & ']' & @LF)
    Return $aRetn
 EndFunc
 
@@ -402,7 +462,7 @@ HotKeySet('{F9}', 'Quit')
 Global $aPosGameFrameTopLeft, $aPosGameFrameBottomRight
 
 Local $bAutoResetLoopIfErrorIsEncountered = False
-Local $iQuestTimeValidationLimit = 52 ; seconds
+Local $iQuestTimeValidationLimit = 55 ; seconds
 
 Local $iSceneState = 0
 ; 0 - Warlic’s Tent portal
@@ -459,14 +519,15 @@ WinActivate('DragonFable - Web RPG')
 
 $aPosGameFrameTopLeft = GetMouseCoordsOnClick('Click top left corner of game frame', 'Step 1 of 2', 1)
 $aPosGameFrameBottomRight = GetMouseCoordsOnClick('Click bottom right corner of game frame', 'Step 2 of 2', 1)
-;~ Global $aPosGameFrameTopLeft[] = [51, 153]
-;~ Global $aPosGameFrameBottomRight[] = [1174, 976]
+;~ Global $aPosGameFrameTopLeft[] = [19, 144]
+;~ Global $aPosGameFrameBottomRight[] = [955, 830]
 
 ConsoleWrite('(' & $aPosGameFrameTopLeft[0] & ', ' & $aPosGameFrameTopLeft[1] & ')' & @LF)
 ConsoleWrite('(' & $aPosGameFrameBottomRight[0] & ', ' & $aPosGameFrameBottomRight[1] & ')' & @LF)
 
 
 #cs
+; Debug
 ; Iterate reagent sampling regions
 
 Local $aPos
@@ -496,54 +557,15 @@ Exit
 
 
 #cs
-; Bulk sell from inventory
-; Need to be in a shop's "Sell" tab.
-; Use at your own risk!
+; Batch sell from inventory using SellFromInventory().
+; Go into a shop's "Sell" tab.
+; Can also be used to bulk destroy items if in player inventory.
+; Function signature hint:
+; 	SellFromInventory($iStartingIndex, $iSellAmount, $iTab)
 
-$iStartSellingAtIndex = 18
-$iSellAmount = 999
+$bConfirmFirstSell = True
 
-$aPos = GetPosFromPercentage($aPosGameFrameTopLeft, $aPosGameFrameBottomRight, 0.249666221628838, 0.087431693989071)
-MouseClick('left', $aPos[0], $aPos[1])
-$aPos = GetPosFromPercentage($aPosGameFrameTopLeft, $aPosGameFrameBottomRight, 0.391188251001335, 0.087431693989071)
-MouseClick('left', $aPos[0], $aPos[1], 1, 10)
-
-For $i = $iStartSellingAtIndex To $iStartSellingAtIndex + $iSellAmount - 1
-   SelectInventorySlot($iStartSellingAtIndex, 0, 0)
-
-   ; Sell button
-   $aPos = GetPosFromPercentage($aPosGameFrameTopLeft, $aPosGameFrameBottomRight, 0.781404549950544, 0.788124156545209)
-   MouseClick('left', $aPos[0], $aPos[1])
-   Sleep(100)
-
-   ; assert scene change -> Sell confirmation dialogue
-   $aPos = GetPosFromPercentage($aPosGameFrameTopLeft, $aPosGameFrameBottomRight, 0.39465875370919, 0.445344129554656)
-   If PixelGetColor($aPos[0], $aPos[1]) = 0xEACEA6 Then
-	  $aPos = GetPosFromPercentage($aPosGameFrameTopLeft, $aPosGameFrameBottomRight, 0.43620178041543, 0.516869095816464)
-
-	  MouseClick('left', $aPos[0], $aPos[1])
-	  Sleep(100)
-
-	  Local $hTimer = TimerInit()
-	  While 1
-		 $aPos = GetPosFromPercentage($aPosGameFrameTopLeft, $aPosGameFrameBottomRight, 0.09, 0.460188933873144)
-		 If PixelGetColor($aPos[0], $aPos[1]) = 0xEACEA6 Then
-			ExitLoop
-		 EndIf
-
-		 If TimerDiff($hTimer) > 4000 Then
-			Exit 1
-		 EndIf
-
-		 Sleep(100)
-	  WEnd
-	  Local $hTimer
-   Else
-	  Exit 0
-   EndIf
-
-   Sleep(100)
-Next
+SellFromInventory(17, 999, 2)
 
 Exit
 #ce
@@ -560,7 +582,7 @@ If $iSceneState = 0 Then
 		 Exit 1
 	  EndIf
 
-	  ; assert scene change
+	  ; assert scene change -> Warlic's Tent portal
 	  Local $hTimer = TimerInit()
 	  Local $aPos
 	  While 1
@@ -579,18 +601,19 @@ If $iSceneState = 0 Then
    EndIf
 EndIf
 
-Local $aPlayerInventoryStats, $iInventoryEmptySpaceLeft
-$aPlayerInventoryStats = FetchPlayerInventoryStats()
-$iInventoryEmptySpaceLeft = $aPlayerInventoryStats[1]
-If IsOnInventoryInterface() Then
-   CloseInventoryInterface()
-EndIf
+Local $aPlayerInventoryStats = FetchPlayerInventoryStats()
+ConsoleWrite('FetchPlayerInventoryStats() -> ' & '[' & $aPlayerInventoryStats[0] & ', ' & $aPlayerInventoryStats[1] & ']' & @LF)
 
+Local $iInventoryEmptySpaceLeft = $aPlayerInventoryStats[1]
 If $iInventoryEmptySpaceLeft = 0 Then
    ToolTip('Inventory full!')
-   Sleep(2500)
+   Sleep(2000)
    ToolTip('')
-   Exit 0
+   Exit 1
+EndIf
+
+If IsOnInventoryInterface() Then
+   CloseInventoryInterface()
 EndIf
 
 While 1
@@ -600,18 +623,12 @@ While 1
 
 		 If $iInventoryEmptySpaceLeft = 0 Then
 			If $bAutoSellRewardsWhenInventoryIsFull Then
-			   $iInventoryEmptySpaceLeft = $aPlayerInventoryStats[1]
-
 			   $iSceneState = 6
-
 			   FastTravel('Falconreach')
 			   If @error Then
 				  Exit 1
 			   EndIf
 			Else
-			   ToolTip('Inventory full!')
-			   Sleep(2500)
-			   ToolTip('')
 			   Exit 0
 			EndIf
 		 Else
@@ -764,13 +781,13 @@ While 1
 		 MouseClick('left')
 		 Sleep(3200)
 
-		 ConsoleWrite('Scanning samples...')
+		 ConsoleWrite('Scanning samples...' & @LF)
 		 For $i = 0 To UBound($aReagentPositions) - 1
 			$aPos1 = GetPosFromPercentage($aPosGameFrameTopLeft, $aPosGameFrameBottomRight, $aReagentSamplingRegions[$i][0][0], $aReagentSamplingRegions[$i][0][1])
 			$aPos2 = GetPosFromPercentage($aPosGameFrameTopLeft, $aPosGameFrameBottomRight, $aReagentSamplingRegions[$i][1][0], $aReagentSamplingRegions[$i][1][1])
 			$aReagentCheckSum[$i] = PixelChecksum($aPos1[0], $aPos1[1], $aPos2[0], $aPos2[1])
 		 Next
-		 ConsoleWrite(' Done' & @LF)
+		 ConsoleWrite('Done' & @LF)
 
 		 Sleep(300)
 
@@ -810,14 +827,12 @@ While 1
 			Local $bNeedDelay
 			For $i = 0 To $iCounter - 1
 			   $bNeedDelay = True
-
 			   If $i > 0 Then
 				  If $aReagentNeeded[$i] = $aReagentNeeded[$i - 1] Then
 					 Sleep(1000)
 					 $bNeedDelay = False
 				  EndIf
 			   EndIf
-
 			   If $bNeedDelay Then
 				  If $i > 1 Then
 					 If $aReagentNeeded[$i] = $aReagentNeeded[$i - 2] Then
@@ -826,11 +841,10 @@ While 1
 					 EndIf
 				  EndIf
 			   EndIf
-
 			   If $bNeedDelay Then
 				  If $i > 2 Then
 					 If $aReagentNeeded[$i] = $aReagentNeeded[$i - 3] Then
-						Sleep(400)
+						Sleep(500)
 						$bNeedDelay = False
 					 EndIf
 				  EndIf
@@ -840,11 +854,11 @@ While 1
 			   Local $fPosYPercentage = $aReagentPositions[$aReagentNeeded[$i]][1]
 			   Local $aPos = GetPosFromPercentage($aPosGameFrameTopLeft, $aPosGameFrameBottomRight, $fPosXPercentage, $fPosYPercentage)
 			   If $i = 0 Then
-				  ; double click to compensate for the countdown text disengaging the cursor at the start of each round
-				  MouseClick('left', $aPos[0], $aPos[1], 2, 5)
-			   Else
-				  MouseClick('left', $aPos[0], $aPos[1], 1, 5)
+				  ; click twice to compensate for the countdown text disengaging the cursor at the start of each round
+				  MouseClick('left', $aPos[0], $aPos[1], 1 , 3)
 			   EndIf
+
+			   MouseClick('left', $aPos[0], $aPos[1], 1, 3)
 
 			   Sleep(50)
 			Next
@@ -872,8 +886,9 @@ While 1
 			   ConsoleWrite('Completed in ' & StringFormat('%.2f', $iQuestTime / 1000) & ' seconds.')
 
 			   If $iQuestTime < 1000 * $iQuestTimeValidationLimit Then
-				  ConsoleWrite(' Break for ' & StringFormat('%.2f', $iQuestTimeValidationLimit - $iQuestTime / 1000) & ' seconds.')
+				  ConsoleWrite(' Break for ' & StringFormat('%.2f', $iQuestTimeValidationLimit - $iQuestTime / 1000) & ' seconds...')
 				  Sleep(1000 * $iQuestTimeValidationLimit - $iQuestTime)
+				  ConsoleWrite(' Done')
 			   EndIf
 
 			   ConsoleWrite(@LF)
@@ -1018,9 +1033,6 @@ While 1
 	  Case 7 ; Yulgar or Lim
 		 ConsoleWrite('Scene 7' & @LF)
 
-		 ; Local $aPos = GetPosFromPercentage($aPosGameFrameTopLeft, $aPosGameFrameBottomRight, 0.606141522029373, 0.234972677595628)
-		 ; If PixelGetColor($aPos[0], $aPos[1]) = 0x566965 Then $bInLimShopScene = True
-
 		 If IsDeclared('bInLimShopScene') And VarGetType($bInLimShopScene) = 'Bool' Then
 			If $bInLimShopScene Then
 			   ; Hello Lim. Lim "Shop" button
@@ -1067,63 +1079,14 @@ While 1
 	  Case 8 ; Yulgar/Lim's shop
 		 ConsoleWrite('Scene 8' & @LF)
 
-		 ; Shop interface "Sell" tab
-		 Local $aPos = GetPosFromPercentage($aPosGameFrameTopLeft, $aPosGameFrameBottomRight, 0.379821958456973, 0.0850202429149798)
-		 MouseClick('left', $aPos[0], $aPos[1])
-
-		 For $i = ($aPlayerInventoryStats[0] - $aPlayerInventoryStats[1]) To $aPlayerInventoryStats[0] - 1
-			SelectInventorySlot($aPlayerInventoryStats[0] - $aPlayerInventoryStats[1] + 1, 0, 0)
-
-			; Sell button
-			$aPos = GetPosFromPercentage($aPosGameFrameTopLeft, $aPosGameFrameBottomRight, 0.781404549950544, 0.788124156545209)
-			MouseClick('left', $aPos[0], $aPos[1])
-			Sleep(100)
-
-			; Confirm sell
-			If $bConfirmFirstSell Then
-			   ToolTip('Press enter to continue selling.', Default, Default, 'Press enter', 1)
-			   While 1
-				  If _IsPressed('0D') Then
-					 ToolTip('')
-					 Sleep(150)
-					 ExitLoop
-				  EndIf
-				  Sleep(50)
-			   WEnd
-			   $bConfirmFirstSell = False
-			EndIf
-
-			; assert scene change -> Sell confirmation dialogue
-			$aPos = GetPosFromPercentage($aPosGameFrameTopLeft, $aPosGameFrameBottomRight, 0.39465875370919, 0.445344129554656)
-			If PixelGetColor($aPos[0], $aPos[1]) = 0xEACEA6 Then
-			   $aPos = GetPosFromPercentage($aPosGameFrameTopLeft, $aPosGameFrameBottomRight, 0.43620178041543, 0.516869095816464)
-			   MouseClick('left', $aPos[0], $aPos[1])
-			   Sleep(100)
-
-			   Local $hTimer = TimerInit()
-			   While 1
-				  $aPos = GetPosFromPercentage($aPosGameFrameTopLeft, $aPosGameFrameBottomRight, 0.09, 0.460188933873144)
-				  If PixelGetColor($aPos[0], $aPos[1]) = 0xEACEA6 Then
-					 ExitLoop
-				  EndIf
-
-				  If TimerDiff($hTimer) > 4000 Then
-					 Exit 1
-				  EndIf
-
-				  Sleep(100)
-			   WEnd
-			   Local $hTimer
-			EndIf
-
-			Sleep(100)
-		 Next
+		 SellFromInventory($aPlayerInventoryStats[0] - $aPlayerInventoryStats[1] + 1, $aPlayerInventoryStats[1], 2)
 
 		 $aPos = GetPosFromPercentage($aPosGameFrameTopLeft, $aPosGameFrameBottomRight, 0.324431256181998, 0.802968960863698)
 		 MouseClick('left', $aPos[0], $aPos[1])
 		 Sleep(100)
 
 		 $iInventoryEmptySpaceLeft = $aPlayerInventoryStats[1]
+		 ConsoleWrite('Assuming ' & $iInventoryEmptySpaceLeft & ' empty inventory spaces')
 
 		 FastTravel("Warlic's Tent")
 		 If @error Then
